@@ -20,18 +20,24 @@ var analyzeFkOrphanCmd = &cobra.Command{
 			return err
 		}
 
-		constraints, err := analyzer.Fks()
+		filter, err := analyze.NewFKFilter(tablesFlag, constraintsFlag, rulesFlag)
+		if err != nil {
+			return err
+		}
+		constraints, err := analyzer.Fks(filter)
 		for _, constraint := range constraints {
 			if constraint.DeleteRule == analyze.RuleCascade {
-				logrus.Infoln(constraint)
-				cnt, err2 := analyzer.CheckForOrphanedRows(constraint)
+				logrus.Infof("Checking for orphaned rows for constraint: %s\n", constraint)
+				cnt, err2 := analyzer.FKOrphanedRowCount(constraint)
 				if err2 != nil {
 					return err2
 				}
 				if cnt == 0 {
 					logrus.Infoln(" -- NONE --")
 				} else {
+					logrus.Infoln("******************")
 					logrus.Infof(" ** %d found **\n", cnt)
+					logrus.Infoln("******************")
 				}
 			}
 		}

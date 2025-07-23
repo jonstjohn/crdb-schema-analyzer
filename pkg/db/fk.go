@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"strings"
 )
 
@@ -14,6 +15,15 @@ type FkRow struct {
 	ReferencedColumns []string
 	UpdateRule        string
 	DeleteRule        string
+}
+
+type FkOrphanedRow struct {
+	TableName         string
+	Columns           []string
+	ReferencedTable   string
+	ReferencedColumns []string
+	PrimaryKeyColumns []string
+	PrimaryKeyValues  []any
 }
 
 const AllSql = `
@@ -78,8 +88,8 @@ LEFT JOIN %s -- $referenced_table
 WHERE %s -- $referenced_columns IS NULL;
 `
 
-func (db *Db) OrphanedCount(
-	table string, columns []string, referencedTable string, referencedColumns []string) (int, error) {
+func (db *Db) OrphanSql(table string, columns []string, referencedTable string,
+	referencedColumns []string, countOnly bool) string {
 	var columnNotNulls []string
 	for _, column := range columns {
 		columnNotNulls = append(columnNotNulls, fmt.Sprintf("\"%s\" IS NOT NULL", column))
@@ -95,16 +105,28 @@ func (db *Db) OrphanedCount(
 		referencedColumnNulls = append(referencedColumnNulls, fmt.Sprintf("\"%s\".\"%s\" IS NULL", referencedTable, ref))
 	}
 
+	selectColumnStr := quoteAndJoin(referencedColumns, ",")
+	if countOnly {
+		selectColumnStr = "COUNT(*)"
+	}
+
 	sql := fmt.Sprintf(OrphanSql,
 		quoteAndJoin(columns, ","),
 		fmt.Sprintf("\"%s\"", table),
 		strings.Join(columnNotNulls, " AND "),
 		//quoteAndJoin(referencedColumns, ","),
-		"COUNT(*)",
+		selectColumnStr,
 		fmt.Sprintf("\"%s\"", referencedTable),
 		strings.Join(joins, " AND "),
 		strings.Join(referencedColumnNulls, " AND "),
 	)
+	return sql
+}
+
+func (db *Db) OrphanedCount(
+	table string, columns []string, referencedTable string, referencedColumns []string) (int, error) {
+	sql := db.OrphanSql(table, columns, referencedTable, referencedColumns, true)
+	logrus.Debugln(sql)
 
 	var count int
 	err := db.Pool.QueryRow(context.Background(), sql).Scan(&count)
@@ -112,6 +134,39 @@ func (db *Db) OrphanedCount(
 		return 0, err
 	}
 	return count, nil
+}
+
+func (db *Db) OrphanedRows(
+	table string, columns []string, referencedTable string, referencedColumns []string) ([]FkOrphanedRow, error) {
+	sql := db.OrphanSql(table, columns, referencedTable, referencedColumns, true)
+	logrus.Debugln(sql)
+
+	var orphanedRows []FkOrphanedRow
+	rows, err := db.Pool.Query(context.Background(), sql)
+	if err != nil {
+		return orphanedRows, err
+	}
+	fields := rows.FieldDescriptions()
+	var pkColumns []string
+	for _, field := range fields {
+		pkColumns = append(pkColumns, field.Name)
+	}
+	for rows.Next() {
+		values, err := rows.Values()
+		orphanedRows = append(orphanedRows, FkOrphanedRow{
+			TableName:         table,
+			Columns:           columns,
+			ReferencedTable:   referencedTable,
+			ReferencedColumns: referencedColumns,
+			PrimaryKeyColumns: pkColumns,
+			PrimaryKeyValues:  values,
+		})
+		if err != nil {
+			return orphanedRows, err
+		}
+
+	}
+	return orphanedRows, nil
 }
 
 func (db *Db) Fks() ([]FkRow, error) {
