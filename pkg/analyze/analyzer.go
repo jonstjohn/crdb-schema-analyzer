@@ -80,8 +80,8 @@ func (a *Analyzer) FKOrphans(constraint FKConstraint) ([]FKOrphan, error) {
 			Columns:           row.Columns,
 			ReferencedTable:   row.ReferencedTable,
 			ReferencedColumns: row.ReferencedColumns,
-			PrimaryKeyColumns: row.PrimaryKeyColumns,
-			PrimaryKeyValues:  row.PrimaryKeyValues,
+			ColumnValues:      row.ColumnValues,
+			Constraint:        constraint,
 		})
 	}
 	return orphans, nil

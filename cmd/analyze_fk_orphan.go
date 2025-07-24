@@ -1,10 +1,13 @@
 package cmd
 
 import (
+	"fmt"
 	"github.com/jonstjohn/crdb-schema-analyzer/pkg/analyze"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
+
+var sqlFlag bool
 
 var analyzeFkOrphanCmd = &cobra.Command{
 	Use:   "orphan",
@@ -26,18 +29,40 @@ var analyzeFkOrphanCmd = &cobra.Command{
 		}
 		constraints, err := analyzer.Fks(filter)
 		for _, constraint := range constraints {
-			if constraint.DeleteRule == analyze.RuleCascade {
-				logrus.Infof("Checking for orphaned rows for constraint: %s\n", constraint)
-				cnt, err2 := analyzer.FKOrphanedRowCount(constraint)
+			logrus.Infof("Checking for orphaned rows for constraint: %s\n", constraint)
+			var cnt int
+			var sqls []string
+			if sqlFlag {
+				orphans, err2 := analyzer.FKOrphans(constraint)
 				if err2 != nil {
 					return err2
 				}
-				if cnt == 0 {
-					logrus.Infoln(" -- NONE --")
-				} else {
-					logrus.Infoln("******************")
-					logrus.Infof(" ** %d found **\n", cnt)
-					logrus.Infoln("******************")
+				for _, orphan := range orphans {
+					sql, err := orphan.Sql()
+					if err != nil {
+						return err
+					}
+					sqls = append(sqls, sql)
+				}
+				cnt = len(orphans)
+			} else {
+				cnt, err = analyzer.FKOrphanedRowCount(constraint)
+				if err != nil {
+					return err
+				}
+			}
+			if cnt == 0 {
+				logrus.Infoln(" -- NONE --")
+			} else {
+				logrus.Infoln("******************")
+				logrus.Infof(" ** %d found **\n", cnt)
+				logrus.Infoln("******************")
+
+				if len(sqls) > 0 {
+					logrus.Infoln("Remediation SQL")
+					for _, sql := range sqls {
+						fmt.Printf("%s;\n", sql)
+					}
 				}
 			}
 		}
@@ -51,4 +76,6 @@ var analyzeFkOrphanCmd = &cobra.Command{
 
 func init() {
 	analyzeFkCmd.AddCommand(analyzeFkOrphanCmd)
+	analyzeFkOrphanCmd.Flags().BoolVarP(&sqlFlag, "sql", "s", false, "Output SQL to remediate")
+
 }

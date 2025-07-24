@@ -22,8 +22,7 @@ type FkOrphanedRow struct {
 	Columns           []string
 	ReferencedTable   string
 	ReferencedColumns []string
-	PrimaryKeyColumns []string
-	PrimaryKeyValues  []any
+	ColumnValues      []any
 }
 
 const AllSql = `
@@ -71,7 +70,7 @@ SELECT
 	referenced_table, referenced_columns,
 	update_rule, delete_rule
 FROM fk_constraints
-ORDER BY table_name, constraint_name;
+ORDER BY table_name, constraint_name
 `
 
 const OrphanSql = `
@@ -85,7 +84,7 @@ SELECT %s -- referenced_columns
 FROM main
 LEFT JOIN %s -- $referenced_table 
   ON %s -- $columns joined with $referenced_columns
-WHERE %s -- $referenced_columns IS NULL;
+WHERE %s -- $referenced_columns IS NULL
 `
 
 func (db *Db) OrphanSql(table string, columns []string, referencedTable string,
@@ -105,10 +104,15 @@ func (db *Db) OrphanSql(table string, columns []string, referencedTable string,
 		referencedColumnNulls = append(referencedColumnNulls, fmt.Sprintf("\"%s\".\"%s\" IS NULL", referencedTable, ref))
 	}
 
-	selectColumnStr := quoteAndJoin(referencedColumns, ",")
+	var selectColumns []string
 	if countOnly {
-		selectColumnStr = "COUNT(*)"
+		selectColumns = append(selectColumns, "COUNT(*)")
+	} else {
+		for _, column := range columns {
+			selectColumns = append(selectColumns, fmt.Sprintf("main.\"%s\"", column))
+		}
 	}
+	selectColumnStr := strings.Join(selectColumns, ", ")
 
 	sql := fmt.Sprintf(OrphanSql,
 		quoteAndJoin(columns, ","),
@@ -136,9 +140,14 @@ func (db *Db) OrphanedCount(
 	return count, nil
 }
 
+// OrphanedRows Get rows that have a FK constraint defined on them but where the corresponding row in the
+// referenced table is missing.
+// Rows returned are for the main table, which references the referenced table.
 func (db *Db) OrphanedRows(
 	table string, columns []string, referencedTable string, referencedColumns []string) ([]FkOrphanedRow, error) {
-	sql := db.OrphanSql(table, columns, referencedTable, referencedColumns, true)
+	sql := db.OrphanSql(table, columns, referencedTable, referencedColumns, false)
+
+	logrus.Debugln("Executing query to find orphaned rows:")
 	logrus.Debugln(sql)
 
 	var orphanedRows []FkOrphanedRow
@@ -146,25 +155,25 @@ func (db *Db) OrphanedRows(
 	if err != nil {
 		return orphanedRows, err
 	}
-	fields := rows.FieldDescriptions()
-	var pkColumns []string
-	for _, field := range fields {
-		pkColumns = append(pkColumns, field.Name)
-	}
+	/*
+		fields := rows.FieldDescriptions()
+		var pkColumns []string
+		for _, field := range fields {
+			pkColumns = append(pkColumns, field.Name)
+		}
+	*/
 	for rows.Next() {
 		values, err := rows.Values()
+		if err != nil {
+			return orphanedRows, err
+		}
 		orphanedRows = append(orphanedRows, FkOrphanedRow{
 			TableName:         table,
 			Columns:           columns,
 			ReferencedTable:   referencedTable,
 			ReferencedColumns: referencedColumns,
-			PrimaryKeyColumns: pkColumns,
-			PrimaryKeyValues:  values,
+			ColumnValues:      values,
 		})
-		if err != nil {
-			return orphanedRows, err
-		}
-
 	}
 	return orphanedRows, nil
 }

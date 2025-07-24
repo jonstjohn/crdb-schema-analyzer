@@ -2,6 +2,7 @@ package analyze
 
 import (
 	"fmt"
+	"github.com/jonstjohn/crdb-schema-analyzer/pkg/db"
 	"strings"
 )
 
@@ -21,8 +22,8 @@ type FKOrphan struct {
 	Columns           []string
 	ReferencedTable   string
 	ReferencedColumns []string
-	PrimaryKeyColumns []string
-	PrimaryKeyValues  []any
+	ColumnValues      []any
+	Constraint        FKConstraint
 }
 
 type FKFilter struct {
@@ -142,6 +143,11 @@ func (filter *FKFilter) Matches(fk FKConstraint) bool {
 		ruleMatches = found
 	}
 	return constraintMatches && tableMatches && ruleMatches
+}
+
+func (orphan *FKOrphan) Sql() (string, error) {
+	return db.DeleteByColumnValuesWithExistsCheckSql(orphan.ReferencedTable, orphan.ReferencedColumns, orphan.ColumnValues,
+		orphan.Constraint.Table, orphan.Constraint.Columns, orphan.ColumnValues)
 }
 
 func parseRule(s string) (Rule, error) {
