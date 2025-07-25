@@ -62,7 +62,6 @@ FROM
   fks INNER JOIN actions ON fks.constraint_name = actions.constraint_name
     INNER JOIN keys ON fks.constraint_name = keys.constraint_name
     INNER JOIN constraints ON fks.constraint_name = constraints.constraint_name
-WHERE delete_rule = 'CASCADE'
 ORDER BY table_name, constraint_name
 )
 SELECT

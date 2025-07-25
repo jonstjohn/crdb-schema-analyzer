@@ -14,6 +14,8 @@ type FKConstraint struct {
 	ReferencedColumns []string
 	UpdateRule        Rule
 	DeleteRule        Rule
+	RegionRestricted  bool
+	ColumnsNoRegion   []string
 }
 
 type FKOrphan struct {
@@ -43,6 +45,11 @@ const (
 	FKFilterRuleTypeUpdate = "UPDATE"
 	FKFilterRuleTypeDelete = "DELETE"
 )
+
+type FKRedundant struct {
+	Table string
+	FKs   []FKConstraint
+}
 
 type Rule string
 
@@ -161,4 +168,32 @@ func parseRule(s string) (Rule, error) {
 	default:
 		return "", fmt.Errorf("invalid Rule: %q", s)
 	}
+}
+
+// IsRedundantWith determines whether a FK constraint is redundant with another FK constraint
+// this occurs when a region restricted FK constraint with a NO ACTION delete has the same UPDATE rule
+// as a non-region restricted FK constraint on the same rows
+// this is a very narrow case
+func (c *FKConstraint) IsRedundantWith(c2 FKConstraint) bool {
+
+	// Make sure they are referencing the same table with the same columns
+	if c.Table != c2.Table || !equalSlices(c.ColumnsNoRegion, c2.ColumnsNoRegion) {
+		return false
+	}
+	// If this constraint is not region restricted or the second one is, not redundant
+	if !c.RegionRestricted || c2.RegionRestricted {
+		return false
+	}
+
+	// If update rules are different, not redundant
+	if c.UpdateRule != c2.UpdateRule {
+		return false
+	}
+
+	// If delete rule is anything other than NO ACTION, not redundant
+	if c.DeleteRule != RuleNoAction {
+		return false
+	}
+
+	return true
 }
