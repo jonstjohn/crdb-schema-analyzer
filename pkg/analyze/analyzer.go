@@ -3,6 +3,7 @@ package analyze
 import (
 	"github.com/jonstjohn/crdb-schema-analyzer/pkg/db"
 	"slices"
+	"sort"
 )
 
 type Analyzer struct {
@@ -22,7 +23,7 @@ func NewAnalyzer(config AnalyzerConfig) (*Analyzer, error) {
 		return nil, err
 	}
 	return &Analyzer{
-		Config: AnalyzerConfig{},
+		Config: config,
 		Db:     d,
 	}, nil
 }
@@ -137,46 +138,89 @@ func (a *Analyzer) FKRedundants() ([]FKConstraint, error) {
 	return redundants, nil
 }
 
-func equalUnordered(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
+// Tables returns tables for all databases
+func (a *Analyzer) Tables(includeSize bool, includeFKs bool) ([]Table, error) {
+
+	var tables []Table
+	tmap := make(map[string]Table)
+
+	// Get output of SHOW tables
+	srows, err := a.Db.ShowTables(a.Config.Database)
+	if err != nil {
+		return tables, err
 	}
-
-	counts := make(map[string]int)
-
-	for _, val := range a {
-		counts[val]++
-	}
-
-	for _, val := range b {
-		if counts[val] == 0 {
-			return false
+	for _, srow := range srows {
+		t := Table{}
+		if _, ok := tmap[srow.Name]; ok {
+			t = tmap[srow.Name]
 		}
-		counts[val]--
+		t.Name = srow.Name
+		t.Database = a.Config.Database
+		t.Owner = srow.Owner
+		t.EstimatedRowCount = srow.EstimatedRowCount
+		t.Locality = srow.Locality
+		tmap[srow.Name] = t
 	}
 
-	return true
-}
-
-// removeString removes string from slice of strings
-func removeString(s []string, target string) []string {
-	for i, v := range s {
-		if v == target {
-			return append(s[:i], s[i+1:]...)
+	// Get table size
+	if includeSize {
+		rows, err := a.Db.TableSize(a.Config.Database)
+		if err != nil {
+			return tables, err
+		}
+		for _, row := range rows {
+			t := Table{}
+			if _, ok := tmap[row.Name]; ok {
+				t = tmap[row.Name]
+			}
+			t.Database = row.Database
+			t.Name = row.Name
+			t.LogicalSizeBytes = row.LogicalBytes
+			tmap[row.Name] = t
 		}
 	}
-	return s // target not found, return original
-}
 
-// equalSlices checks to see if slices are equal and ordered the same
-func equalSlices(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
+	// Add FK relationships
+	if includeFKs {
+		fks, err := a.Fks(nil)
+		if err != nil {
+			return tables, err
+		}
+		for _, fk := range fks {
+			// FK defined on this table
+			if _, ok := tmap[fk.Table]; ok {
+				t := tmap[fk.Table]
+				t.FKs = append(t.FKs, fk)
+				tmap[fk.Table] = t
+			}
+			// Table referenced from another table, consider referenced
+			// lookup referenced table and update its referenced FKs
+			if _, ok := tmap[fk.ReferencedTable]; ok {
+				t := tmap[fk.ReferencedTable]
+				t.ReferencedFKs = append(t.ReferencedFKs, fk)
+				tmap[fk.ReferencedTable] = t
+			}
 		}
 	}
-	return true
+
+	// Get tables from map
+	for _, t := range tmap {
+		tables = append(tables, t)
+	}
+
+	// Sort tables
+	sort.Slice(tables, func(i, j int) bool {
+		// sort by logical size bytes desc, if present
+		if tables[i].LogicalSizeBytes > 0 || tables[j].LogicalSizeBytes > 0 {
+			return tables[i].LogicalSizeBytes > tables[j].LogicalSizeBytes
+		}
+		// sort by row count desc, if present
+		if tables[i].EstimatedRowCount > 0 || tables[j].EstimatedRowCount > 0 {
+			return tables[i].EstimatedRowCount > tables[j].EstimatedRowCount
+		}
+		// otherwise, sort by name asc
+		return tables[i].Name < tables[j].Name
+	})
+
+	return tables, nil
 }
