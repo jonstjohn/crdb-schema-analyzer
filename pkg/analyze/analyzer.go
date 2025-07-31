@@ -18,7 +18,7 @@ type AnalyzerConfig struct {
 
 func NewAnalyzer(config AnalyzerConfig) (*Analyzer, error) {
 
-	d, err := db.NewDbDatasource(config.DbUrl, config.Database)
+	d, err := db.NewDbDatasource(config.DbUrl, config.Database, true)
 	if err != nil {
 		return nil, err
 	}
@@ -38,15 +38,16 @@ func (a *Analyzer) Fks(filter *FKFilter) ([]FKConstraint, error) {
 
 	for _, fk := range fks {
 		constraint := FKConstraint{
-			Name:              fk.ConstraintName,
-			Table:             fk.TableName,
-			Columns:           fk.Columns,
-			ReferencedTable:   fk.ReferencedTable,
-			ReferencedColumns: fk.ReferencedColumns,
-			UpdateRule:        Rule(fk.UpdateRule),
-			DeleteRule:        Rule(fk.DeleteRule),
-			RegionRestricted:  slices.Contains(fk.Columns, "crdb_region"),
-			ColumnsNoRegion:   removeString(fk.Columns, "crdb_region"),
+			Name:                      fk.ConstraintName,
+			Table:                     fk.TableName,
+			Columns:                   fk.Columns,
+			ReferencedTable:           fk.ReferencedTable,
+			ReferencedColumns:         fk.ReferencedColumns,
+			UpdateRule:                Rule(fk.UpdateRule),
+			DeleteRule:                Rule(fk.DeleteRule),
+			RegionRestricted:          slices.Contains(fk.Columns, "crdb_region"),
+			ColumnsNoRegion:           removeString(fk.Columns, "crdb_region"),
+			ReferencedColumnsNoRegion: removeString(fk.ReferencedColumns, "crdb_region"),
 		}
 		if filter == nil || filter.Matches(constraint) {
 			constraints = append(constraints, constraint)

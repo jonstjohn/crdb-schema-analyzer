@@ -7,15 +7,16 @@ import (
 )
 
 type FKConstraint struct {
-	Name              string
-	Table             string
-	Columns           []string
-	ReferencedTable   string
-	ReferencedColumns []string
-	UpdateRule        Rule
-	DeleteRule        Rule
-	RegionRestricted  bool
-	ColumnsNoRegion   []string
+	Name                      string
+	Table                     string
+	Columns                   []string
+	ReferencedTable           string
+	ReferencedColumns         []string
+	UpdateRule                Rule
+	DeleteRule                Rule
+	RegionRestricted          bool
+	ColumnsNoRegion           []string
+	ReferencedColumnsNoRegion []string
 }
 
 type FKOrphan struct {
@@ -70,6 +71,12 @@ func (fk FKConstraint) String() string {
 		fk.UpdateRule,
 		fk.DeleteRule,
 	)
+}
+
+// GenerateNameNoRegion is used to generate an FK constraint name that does not contain crdb_region
+// this is used for converting tables from RBR to RBT
+func (fk FKConstraint) GenerateNameNoRegion() string {
+	return fmt.Sprintf("%s_%s_fkey", fk.Table, strings.Join(fk.ColumnsNoRegion, "_"))
 }
 
 func NewFKFilter(tables []string, constraints []string, ruleStrs []string) (*FKFilter, error) {
@@ -153,8 +160,8 @@ func (filter *FKFilter) Matches(fk FKConstraint) bool {
 }
 
 func (orphan *FKOrphan) Sql() (string, error) {
-	return db.DeleteByColumnValuesWithExistsCheckSql(orphan.ReferencedTable, orphan.ReferencedColumns, orphan.ColumnValues,
-		orphan.Constraint.Table, orphan.Constraint.Columns, orphan.ColumnValues)
+	return db.DeleteByColumnValuesWithExistsCheckSql(orphan.Table, orphan.Columns, orphan.ColumnValues,
+		orphan.Constraint.ReferencedTable, orphan.Constraint.ReferencedColumns, orphan.ColumnValues)
 }
 
 func parseRule(s string) (Rule, error) {
@@ -174,24 +181,24 @@ func parseRule(s string) (Rule, error) {
 // this occurs when a region restricted FK constraint with a NO ACTION delete has the same UPDATE rule
 // as a non-region restricted FK constraint on the same rows
 // this is a very narrow case
-func (c *FKConstraint) IsRedundantWith(c2 FKConstraint) bool {
+func (fk FKConstraint) IsRedundantWith(c2 FKConstraint) bool {
 
 	// Make sure they are referencing the same table with the same columns
-	if c.Table != c2.Table || !equalSlices(c.ColumnsNoRegion, c2.ColumnsNoRegion) {
+	if fk.Table != c2.Table || !equalSlices(fk.ColumnsNoRegion, c2.ColumnsNoRegion) {
 		return false
 	}
 	// If this constraint is not region restricted or the second one is, not redundant
-	if !c.RegionRestricted || c2.RegionRestricted {
+	if !fk.RegionRestricted || c2.RegionRestricted {
 		return false
 	}
 
 	// If update rules are different, not redundant
-	if c.UpdateRule != c2.UpdateRule {
+	if fk.UpdateRule != c2.UpdateRule {
 		return false
 	}
 
 	// If delete rule is anything other than NO ACTION, not redundant
-	if c.DeleteRule != RuleNoAction {
+	if fk.DeleteRule != RuleNoAction {
 		return false
 	}
 

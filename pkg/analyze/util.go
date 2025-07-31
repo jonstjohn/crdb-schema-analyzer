@@ -1,6 +1,9 @@
 package analyze
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 func equalUnordered(a, b []string) bool {
 	if len(a) != len(b) {
@@ -57,4 +60,28 @@ func formatBytes(bytes uint64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}
+
+func quoteIdentifier(s string) string {
+	return fmt.Sprintf("\"%s\"", s)
+}
+
+func quoteAndJoinIdentifiers(strs []string) string {
+	var cols []string
+	for _, str := range strs {
+		cols = append(cols, quoteIdentifier(str))
+	}
+	return strings.Join(cols, ",")
+}
+
+func quoteIdentifierWithDatabase(db string, s string) string {
+	return fmt.Sprintf("%s.%s", quoteIdentifier(db), quoteIdentifier(s))
+}
+
+func quoteAndJoinIdentifiersWithDatabase(db string, strs []string) string {
+	var cols []string
+	for _, str := range strs {
+		cols = append(cols, quoteIdentifierWithDatabase(db, str))
+	}
+	return strings.Join(cols, ",")
 }

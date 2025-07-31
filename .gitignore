@@ -26,3 +26,5 @@
 /bin/crdb-schema-analyzer
 
 .DS_Store
+
+/tmp/

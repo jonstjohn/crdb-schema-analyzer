@@ -1,0 +1,87 @@
+name: Release Binaries
+
+on:
+  push:
+    tags:
+      - 'v*' # Trigger on any tag starting with 'v'
+
+jobs:
+  release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Needed for creating GitHub releases
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22' # You can adjust this to your Go version
+
+      - name: Get tag version
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Get dependencies
+        run: go mod tidy
+
+      - name: Build binaries
+        run: |
+          mkdir -p release
+          
+          # Build for Linux
+          GOOS=linux GOARCH=amd64 go build -o release/crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-linux-amd64 ./
+          GOOS=linux GOARCH=arm64 go build -o release/crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-linux-arm64 ./
+          
+          # Build for macOS
+          GOOS=darwin GOARCH=amd64 go build -o release/crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-darwin-amd64 ./
+          GOOS=darwin GOARCH=arm64 go build -o release/crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-darwin-arm64 ./
+          
+          # Build for Windows
+          GOOS=windows GOARCH=amd64 go build -o release/crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-windows-amd64.exe ./
+          GOOS=windows GOARCH=386 go build -o release/crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-windows-386.exe ./
+
+      - name: Create checksums
+        run: |
+          cd release
+          for file in *; do
+            sha256sum "$file" > "${file}.sha256"
+          done
+          cd ..
+
+      - name: Package binaries
+        run: |
+          
+          # Copy reports/ directory into the release folder
+          cp -r reports release/
+          
+          cd release
+          
+          # Linux
+          tar czf crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-linux-amd64.tar.gz crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-linux-amd64 crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-linux-amd64.sha256 reports
+          tar czf crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-linux-arm64.tar.gz crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-linux-arm64 crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-linux-arm64.sha256 reports
+          
+          # macOS
+          tar czf crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.tar.gz crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-darwin-amd64 crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.sha256 reports
+          tar czf crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.tar.gz crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-darwin-arm64 crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.sha256 reports
+          
+          # Windows
+          zip crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-windows-amd64.zip crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-windows-amd64.exe crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-windows-amd64.exe.sha256 reports
+          zip crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-windows-386.zip crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-windows-386.exe crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-windows-386.exe.sha256 reports
+          
+          cd ..
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ steps.get_version.outputs.VERSION }}
+          draft: false
+          prerelease: false
+          files: |
+            release/*.tar.gz
+            release/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

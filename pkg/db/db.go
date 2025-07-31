@@ -14,14 +14,16 @@ type Db struct {
 	Database string
 }
 
-func NewDbDatasource(url string, database string) (*Db, error) {
+func NewDbDatasource(url string, database string, readOnly bool) (*Db, error) {
 	pool, err := dbpgx.NewPoolFromUrl(url)
 	if err != nil {
 		return nil, err
 	}
-	_, err = pool.Exec(context.Background(), "SET application_name = '$ crdb-schema-analyzer'")
-	_, err = pool.Exec(context.Background(), "SET default_transaction_quality_of_service=background")
-	_, err = pool.Exec(context.Background(), "SET default_transaction_use_follower_reads=on")
+	if readOnly {
+		_, err = pool.Exec(context.Background(), "SET application_name = '$ crdb-schema-analyzer'")
+		_, err = pool.Exec(context.Background(), "SET default_transaction_quality_of_service=background")
+		_, err = pool.Exec(context.Background(), "SET default_transaction_use_follower_reads=on")
+	}
 	if err != nil {
 		return nil, err
 	}

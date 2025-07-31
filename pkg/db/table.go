@@ -35,7 +35,7 @@ type ShowTablesRow struct {
 }
 
 const showTableSql = `
-SHOW TABLES FROM %s
+WITH x AS (SHOW TABLES FROM %s) SELECT * FROM x WHERE type = 'table'
 `
 
 // TableSize gets the logical table sizes for all tables/databases
