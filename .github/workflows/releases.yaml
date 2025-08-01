@@ -55,9 +55,6 @@ jobs:
       - name: Package binaries
         run: |
           
-          # Copy reports/ directory into the release folder
-          cp -r reports release/
-          
           cd release
           
           # Linux
@@ -65,12 +62,12 @@ jobs:
           tar czf crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-linux-arm64.tar.gz crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-linux-arm64 crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-linux-arm64.sha256 reports
           
           # macOS
-          tar czf crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.tar.gz crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-darwin-amd64 crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.sha256 reports
-          tar czf crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.tar.gz crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-darwin-arm64 crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.sha256 reports
+          tar czf crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.tar.gz crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-darwin-amd64 crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.sha256 
+          tar czf crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.tar.gz crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-darwin-arm64 crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-darwin-arm64.sha256
           
           # Windows
-          zip crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-windows-amd64.zip crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-windows-amd64.exe crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-windows-amd64.exe.sha256 reports
-          zip crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-windows-386.zip crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-windows-386.exe crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-windows-386.exe.sha256 reports
+          zip crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-windows-amd64.zip crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-windows-amd64.exe crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-windows-amd64.exe.sha256
+          zip crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-windows-386.zip crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-windows-386.exe crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-windows-386.exe.sha256
           
           cd ..
 
