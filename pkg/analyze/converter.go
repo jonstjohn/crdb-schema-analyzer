@@ -153,21 +153,24 @@ func (c *Converter) Rbr2rbtSqlStatements(primaryRegion string) ([]string, error)
 
 	statements = append(statements, "-- FILE END")
 
-	// Next iterate over tables again to run update crdb_region to the primary region
-	// this allows us to remove the non-primary regions from the database
-	statements = append(statements, "-- FILE START update_crdb_region.sql")
+	/*
+		// Next iterate over tables again to run update crdb_region to the primary region
+		// this allows us to remove the non-primary regions from the database
+		statements = append(statements, "-- FILE START update_crdb_region.sql")
 
-	// Iterate over tables again to change locality
-	for _, table := range tables {
-		// Add SQL to alter the locality of the table
-		sql := fmt.Sprintf("UPDATE %s SET crdb_region = '%s' WHERE id IN ( SELECT id FROM %s WHERE crdb_region != '%s' LIMIT 100)",
-			quoteIdentifierWithDatabase(table.Database, table.Name), primaryRegion,
-			quoteIdentifierWithDatabase(table.Database, table.Name), primaryRegion,
-		)
-		statements = append(statements, wrapSqlInBlock([]string{sql})...)
-	}
+		// Iterate over tables again to change locality
+		for _, table := range tables {
+			// Add SQL to alter the locality of the table
+			sql := fmt.Sprintf("UPDATE %s SET crdb_region = '%s' WHERE id IN ( SELECT id FROM %s WHERE crdb_region != '%s' LIMIT 100)",
+				quoteIdentifierWithDatabase(table.Database, table.Name), primaryRegion,
+				quoteIdentifierWithDatabase(table.Database, table.Name), primaryRegion,
+			)
+			statements = append(statements, wrapSqlInBlock([]string{sql})...)
+		}
 
-	statements = append(statements, "-- FILE END")
+		statements = append(statements, "-- FILE END")
+
+	*/
 
 	// As an alternative to updated crdb_region to the primary region, just iterate over tables again to change
 	// the crdb_region column to a string
@@ -176,7 +179,22 @@ func (c *Converter) Rbr2rbtSqlStatements(primaryRegion string) ([]string, error)
 	// Iterate over tables again to change locality
 	for _, table := range tables {
 		// Add SQL to alter the locality of the table
-		sql := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN crdb_region SET DATA TYPE STRING",
+		var sqls []string
+		sqls = append(sqls, fmt.Sprintf("ALTER TABLE %s ALTER COLUMN crdb_region SET DATA TYPE STRING",
+			quoteIdentifierWithDatabase(table.Database, table.Name)))
+		sqls = append(sqls,
+			fmt.Sprintf("ALTER TABLE %s ALTER COLUMN crdb_region SET DEFAULT default_to_database_primary_region(gateway_region())::STRING",
+				quoteIdentifierWithDatabase(table.Database, table.Name)))
+		statements = append(statements, wrapSqlInBlock(sqls)...)
+	}
+
+	statements = append(statements, "-- FILE END")
+
+	// Discard zone overrides for all tables - they will default to RBT
+	statements = append(statements, "-- FILE START zone_config_discard.sql")
+	for _, table := range tables {
+		// Add SQL to alter the locality of the table
+		sql := fmt.Sprintf("ALTER TABLE %s CONFIGURE ZONE DISCARD",
 			quoteIdentifierWithDatabase(table.Database, table.Name))
 		statements = append(statements, wrapSqlInBlock([]string{sql})...)
 	}

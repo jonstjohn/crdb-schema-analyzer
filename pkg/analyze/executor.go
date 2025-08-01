@@ -133,15 +133,17 @@ func (e *Executor) executeSQLStatements(statements []string) error {
 		}
 	}
 
-	// Execute SQL statements - once unless UntilZeroRows is set to true, in which case we are performing a batch
-	// operation and want to continue
-	keepGoing := true
+	// Execute SQL statements
 	for i, statement := range statements {
+		// Execute once unless UntilZeroRows is set to true, in which case we are performing a batch
+		// operation and want to continue
+		keepGoing := true
 		for keepGoing {
 			tag, err := conn.Exec(context.Background(), statement)
 			if err != nil {
 				return fmt.Errorf("failed on statement %d '%s': %w", i+1, statement, err)
 			}
+			logrus.Infof("Successfully executed '%s'", statement)
 			keepGoing = e.Config.UntilZeroRows && tag.RowsAffected() > 0
 		}
 	}
