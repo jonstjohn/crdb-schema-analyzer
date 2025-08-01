@@ -58,8 +58,8 @@ jobs:
           cd release
           
           # Linux
-          tar czf crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-linux-amd64.tar.gz crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-linux-amd64 crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-linux-amd64.sha256 reports
-          tar czf crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-linux-arm64.tar.gz crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-linux-arm64 crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-linux-arm64.sha256 reports
+          tar czf crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-linux-amd64.tar.gz crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-linux-amd64 crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-linux-amd64.sha256
+          tar czf crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-linux-arm64.tar.gz crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-linux-arm64 crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-linux-arm64.sha256
           
           # macOS
           tar czf crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.tar.gz crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-darwin-amd64 crdb-schema-analyzer-${{ steps.get_version.outputs.VERSION }}-darwin-amd64.sha256 
