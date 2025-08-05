@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 )
 
 type Executor struct {
@@ -94,6 +95,8 @@ func (e *Executor) ExecuteFromFile(filePath string) error {
 	sqlChan := make(chan []string, len(statementBlocks))
 	var wg sync.WaitGroup
 
+	start := time.Now()
+
 	// Start worker goroutines
 	for i := 0; i < e.Config.Concurrency; i++ {
 		wg.Add(1)
@@ -116,6 +119,8 @@ func (e *Executor) ExecuteFromFile(filePath string) error {
 
 	// Wait for all workers to finish
 	wg.Wait()
+
+	logrus.Infof("Completed executing all SQL in %s", time.Since(start))
 	return nil
 
 }
@@ -139,11 +144,12 @@ func (e *Executor) executeSQLStatements(statements []string) error {
 		// operation and want to continue
 		keepGoing := true
 		for keepGoing {
+			start := time.Now()
 			tag, err := conn.Exec(context.Background(), statement)
 			if err != nil {
 				return fmt.Errorf("failed on statement %d '%s': %w", i+1, statement, err)
 			}
-			logrus.Infof("Successfully executed '%s'", statement)
+			logrus.Infof("Successfully executed '%s' in %s", statement, time.Since(start))
 			keepGoing = e.Config.UntilZeroRows && tag.RowsAffected() > 0
 		}
 	}
