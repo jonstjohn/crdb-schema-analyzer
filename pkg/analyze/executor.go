@@ -26,7 +26,7 @@ type ExecutorConfig struct {
 }
 
 func NewExecutor(config ExecutorConfig) (*Executor, error) {
-	d, err := db.NewDbDatasource(config.DbUrl, config.Database, false)
+	d, err := db.NewDbDatasource(config.DbUrl, config.Database, false, config.Concurrency)
 	if err != nil {
 		return nil, err
 	}

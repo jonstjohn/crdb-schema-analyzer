@@ -14,8 +14,8 @@ type Db struct {
 	Database string
 }
 
-func NewDbDatasource(url string, database string, readOnly bool) (*Db, error) {
-	pool, err := dbpgx.NewPoolFromUrl(url)
+func NewDbDatasource(url string, database string, readOnly bool, concurrency int) (*Db, error) {
+	pool, err := dbpgx.NewPoolFromUrl(url, concurrency)
 	if err != nil {
 		return nil, err
 	}

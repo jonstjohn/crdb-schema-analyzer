@@ -18,7 +18,7 @@ type AnalyzerConfig struct {
 
 func NewAnalyzer(config AnalyzerConfig) (*Analyzer, error) {
 
-	d, err := db.NewDbDatasource(config.DbUrl, config.Database, true)
+	d, err := db.NewDbDatasource(config.DbUrl, config.Database, true, 1)
 	if err != nil {
 		return nil, err
 	}
