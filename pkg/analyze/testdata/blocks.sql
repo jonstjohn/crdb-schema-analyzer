@@ -1,0 +1,7 @@
+-- BEGIN BLOCK
+SELECT * FROM test;
+INSERT INTO test(v) VALUES ('foo'), ('bar');
+-- END BLOCK
+-- BEGIN BLOCK
+SET CLUSTER SETTING foo = 'bar';
+-- END BLOCK

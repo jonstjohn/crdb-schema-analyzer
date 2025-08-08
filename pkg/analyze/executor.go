@@ -1,12 +1,10 @@
 package analyze
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"github.com/jonstjohn/crdb-schema-analyzer/pkg/db"
 	"github.com/sirupsen/logrus"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -36,60 +34,12 @@ func NewExecutor(config ExecutorConfig) (*Executor, error) {
 	}, nil
 }
 
-// ExecuteFromFile executes statements from a file
-// It looks for "-- BEGIN BLOCK" and "-- END BLOCK" and sends those as a batch to one of the goroutines
-// If a statement occurs outside of a begin and end, it just sends the single statement
 func (e *Executor) ExecuteFromFile(filePath string) error {
-	file, err := os.Open(filePath)
+
+	parser := NewSqlFileParser(filePath)
+	statementBlocks, err := parser.Parse()
 	if err != nil {
 		return err
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-
-	var statementBlocks [][]string
-	var currentBlock []string
-	var inBlock bool
-
-	// var lines []string
-	for scanner.Scan() {
-		// lines = append(lines, scanner.Text())
-		line := strings.TrimSpace(scanner.Text())
-
-		switch line {
-		case "-- BEGIN BLOCK":
-			if inBlock {
-				return fmt.Errorf("nested -- BEGIN BLOCK not allowed")
-			}
-			inBlock = true
-			currentBlock = []string{}
-
-		case "-- END BLOCK":
-			if !inBlock {
-				return fmt.Errorf("-- END BLOCK without -- BEGIN BLOCK")
-			}
-			inBlock = false
-			if len(currentBlock) > 0 {
-				statementBlocks = append(statementBlocks, currentBlock)
-			}
-
-		default:
-			if line == "" || strings.HasPrefix(line, "--") { // empty line or comment
-				continue
-			}
-			if inBlock {
-				currentBlock = append(currentBlock, line)
-			} else {
-				statementBlocks = append(statementBlocks, []string{line})
-			}
-		}
-	}
-	if scanner.Err() != nil {
-		return scanner.Err()
-	}
-	if inBlock {
-		return fmt.Errorf("unclosed -- BEGIN BLOCK at end of file")
 	}
 
 	sqlChan := make(chan []string, len(statementBlocks))
@@ -97,13 +47,12 @@ func (e *Executor) ExecuteFromFile(filePath string) error {
 
 	start := time.Now()
 
-	// Start worker goroutines
 	for i := 0; i < e.Config.Concurrency; i++ {
 		wg.Add(1)
 		go func(workerId int) {
 			defer wg.Done()
 			for batch := range sqlChan {
-				logrus.Infof("Executing [%d]: %s\n", workerId, strings.Join(batch, "\n"))
+				logrus.Infof("Executing [%d]:\n%s", workerId, strings.Join(batch, "\n---\n"))
 				if err := e.executeSQLStatements(batch); err != nil {
 					logrus.Errorf("Error [%d]: %v", workerId, err)
 				}
@@ -111,18 +60,14 @@ func (e *Executor) ExecuteFromFile(filePath string) error {
 		}(i)
 	}
 
-	// Send SQL statements to workers
 	for _, block := range statementBlocks {
 		sqlChan <- block
 	}
 	close(sqlChan)
 
-	// Wait for all workers to finish
 	wg.Wait()
-
 	logrus.Infof("Completed executing all SQL in %s", time.Since(start))
 	return nil
-
 }
 
 func (e *Executor) executeSQLStatements(statements []string) error {
