@@ -74,7 +74,7 @@ ORDER BY table_name, constraint_name
 
 const OrphanSql = `
 -- Get all rows from the main table
-WITH main AS (
+WITH main AS MATERIALIZED (
   SELECT %s FROM %s -- columns, table_name
   WHERE %s -- both columns are not null
 )
