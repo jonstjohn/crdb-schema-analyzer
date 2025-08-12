@@ -163,9 +163,14 @@ func parseConstraints(input string) ([]ZoneConfigConstraint, error) {
 	if len(input) >= 2 && input[0] == '{' && input[len(input)-1] == '}' {
 		input = input[1 : len(input)-1]
 	}
-	//input = strings.Trim(input, "[]{}")
+
+	if len(input) == 0 {
+		return constraints, nil
+	}
+
+	// Split the input
 	parts := strings.Split(input, ",")
-	for _, part := range parts {
+	for i, part := range parts {
 		part = strings.TrimSpace(part)
 		if len(part) >= 2 && part[0] == '[' && part[len(part)-1] == ']' {
 			part = part[1 : len(part)-1]
@@ -173,7 +178,7 @@ func parseConstraints(input string) ([]ZoneConfigConstraint, error) {
 		part = strings.TrimSpace(part)
 		constraint := ZoneConfigConstraint{}
 		if len(part) == 0 {
-			return constraints, errors.New("zone config: empty input")
+			return constraints, errors.New(fmt.Sprintf("error processing constraints, part %d in '%s' is empty", i, input))
 		}
 		re := regexp.MustCompile(`^([+-])([a-zA-Z0-9_-]+=.+?)(?::\s*(\d+))?$`)
 		matches := re.FindStringSubmatch(part)
