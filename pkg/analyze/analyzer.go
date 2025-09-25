@@ -225,3 +225,7 @@ func (a *Analyzer) Tables(includeSize bool, includeFKs bool) ([]Table, error) {
 
 	return tables, nil
 }
+
+func (a *Analyzer) GetRbrRowData(region string) ([]db.RbrTableRowLocalities, error) { // TODO
+	return a.Db.GetRowCountsOutsideRegion(region)
+}
